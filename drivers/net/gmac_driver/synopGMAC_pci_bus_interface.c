@@ -1,0 +1,415 @@
+/* ===================================================================================
+ * Copyright (c) <2009> Synopsys, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software annotated with this license and associated documentation files 
+ * (the "Software"), to deal in the Software without restriction, including without 
+ * limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+ * and/or sell copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION 
+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
+ * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * =================================================================================== */
+
+
+/**\file
+ * This file encapsulates all the PCI dependent initialization and resource allocation
+ * on Linux
+ */  
+  
+#include <linux/autoconf.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+/*revised by clm at 2014/9/5*/
+/*******************************************************************************************/
+#include <linux/platform_device.h>
+/*******************************************************************************************/
+#include <linux/init.h>
+#include <linux/dma-mapping.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+  
+#include "synopGMAC_plat.h"
+#include "synopGMAC_pci_bus_interface.h"
+#include "synopGMAC_Host.h"  
+/**********************************************************************************/ 
+  
+//#define SYNOPGMAC_VENDOR_ID  0x0700
+//#define SYNOPGMAC_DEVICE_ID  0x1108
+/*  不用PCI，所以不需要BAR,revised by clm at 2014/9/2
+#define BAR0  0
+#define BAR1  1
+#define BAR2  2
+#define BAR3  3
+#define BAR4  4
+#define BAR5  5    */
+/*revised by clm at 2014/9/11*/
+//static u8 synopGMAC_driver_name[] = "mapu-gmac";
+//static struct pci_device_id ids[] = { 
+//    {PCI_DEVICE (SYNOPGMAC_VENDOR_ID, SYNOPGMAC_DEVICE_ID),}, {0,} 
+//};
+/*  不用PCI，所以不需要synop_pci_using_dac,revised by clm at 2014/9/2
+
+u32 synop_pci_using_dac;
+
+*/
+
+/**********************************************************************************/ 
+extern u8 *synopGMACMappedAddr;
+extern u32 synopGMACMappedAddrSize;
+/*  不用PCI，所以不需要synopGMACpcidev,revised by clm at 2014/9/2
+
+extern struct pci_dev *synopGMACpcidev;
+
+*/
+/*revised by clm at 2014/9/9*/
+extern struct platform_device *synopGMACplatdev;
+/*revised by clm at 2014/9/19*/
+//extern synopGMACNetworkAdapter * synopGMACadapter;
+int irq_gmac;
+/* Get the pci revision id */ 
+/*  不用PCI，所以不需要get_revision,revised by clm at 2014/9/2
+
+  static unsigned char get_revision (struct pci_dev *dev) 
+{
+  u8 revision;
+  pci_read_config_byte (dev, PCI_REVISION_ID, &revision);
+  return revision;
+}
+
+*/
+
+/**
+ * probe function of Linux gmac driver.
+ */ 
+ /*revised by clm at 2014/9/3*/
+static int gmac_probe (struct platform_device *pdev) 
+{
+//struct gmac_plat_data *pdata = pdev->dev.platform_data;
+//struct board_info_gmac *db;
+//struct net_device *netdev;
+int ret = 0;
+int irq;
+int size;
+struct resource *res;
+//synopGMACNetworkAdapter *synopGMACadapter;
+/*revised by clm at 2014/9/11*/
+s32 err;
+TR("it's ok now!\n");   /*revised by clm at 2014/10/16*/
+
+//	netdev = alloc_etherdev(sizeof(synopGMACNetworkAdapter));
+//	if(!netdev){
+//	err = -ESYNOPGMACNOMEM;
+//	goto err_alloc_etherdev;
+//	}
+//printk("alloc_etherdev is ok!\n");
+/* Init network device */
+/*在synopGMAC_pci_bus_interface.c中已完成如下操作*/
+/*
+netdev = alloc_etherdev(sizeof(struct synopGMACAdapterStruct));
+if (!netdev) {
+	dev_err(&pdev->dev, "could not allocate device.\n");
+	return -ENOMEM;
+}
+*/
+/*revised by clm at 2014/9/12*/
+//SET_NETDEV_DEV(netdev, &pdev->dev);
+//printk("SET_NETDEV_DEV is ok!\n");
+//dev_dbg(&pdev->dev, "gmac_probe()\n");
+//printk("SET_NETDEV_DEV is still ok!\n");
+//synopGMACadapter->dev = &pdev->dev;
+//printk("synopGMACadapter->dev is commented!");
+
+irq = platform_get_irq(pdev, 0);
+if (irq < 0) {
+	dev_err(&pdev->dev, "no irq for device\n");
+	return -ENOENT;
+}
+TR("platform_get_irq is ok!\n");     /*revised by clm at 2014/10/16*/
+/*revised by clm at 2014/9/17*/
+irq_gmac = irq;
+TR("irq NO is %d\n",irq_gmac);  /*revised by clm at 2014/10/16*/
+res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+if (res == NULL) {
+	dev_err(&pdev->dev, "failed to get memory registers\n");
+	ret = -ENXIO;
+//	goto dealloc;
+}
+TR("platform_get_resource is ok!\n");     /*revised by clm at 2014/10/16*/
+
+size = (res->end - res->start) + 1;
+
+
+synopGMACMappedAddr = (u8 *)ioremap((u32)res->start,(size_t)(128*1024));
+synopGMACMappedAddrSize = (128*1024);
+TR("ioremap is ok!\n");       /*revised by clm at 2014/10/16*/
+if(!synopGMACMappedAddr){
+	TR0 ("ioremap_nocache failed with addrrss %08x\n", (u32) synopGMACMappedAddr);
+  }
+    TR ("Physical address = %08x\n", res->start);     /*revised by clm at 2014/10/16*/
+    TR ("Remapped address = %08x\n", (u32) synopGMACMappedAddr);    /*revised by clm at 2014/10/16*/
+    /*Check if region is already locked by any other driver ? */ 
+    if (check_mem_region ((u32) synopGMACMappedAddr, synopGMACMappedAddrSize))
+    {
+      synopGMACMappedAddr = 0;	// Errored in checking memory region   
+      TR0("Memory Already Locked !!\n");
+      iounmap (synopGMACMappedAddr);
+      return -EBUSY;
+    }
+	//printk("check_mem_region is ok!\n");
+    /*Great We have free memory of required size.. Lets Lock it... */ 
+    request_mem_region ((u32) synopGMACMappedAddr, synopGMACMappedAddrSize,"synopGMACmemory");
+    TR ("Requested memory region for synopGMACMappedAddr = 0x%x\n", (u32) synopGMACMappedAddr);
+	//printk("request_mem_region is ok!\n");
+	    synopGMACplatdev = pdev;
+	TR("synopGMACplatdev = pdev is ok!\n");     /*revised by clm at 2014/10/16*/
+
+//	platform_set_drvdata(pdev, netdev);
+
+//  netdev->irq = irq;
+  
+  return 0;			// Everything is fine. So return 0.
+/**********************************************************************************
+  s32 retval;
+  u16 word_data = 0;
+  u32 double_word_data = 0;
+  
+**********************************************************************************/
+  
+    /* Do probing type stuff here.  
+     * Like calling request_region();
+     */ 
+     
+//    TR ("ENABLING PCI DEVICE\n");
+  
+    /* Enable the device */ 
+	/**********************************************************************************
+
+    if (pci_enable_device (pdev))
+    {
+      return -ENODEV;
+    }
+  if (!(retval = pci_set_dma_mask (pdev, DMA_64BIT_MASK))
+	&& !(retval = pci_set_consistent_dma_mask (pdev, DMA_64BIT_MASK)))
+    {
+      synop_pci_using_dac = 1;
+    }
+  
+  else
+    {
+      if ((pci_set_dma_mask (pdev, DMA_32BIT_MASK))
+	   && (retval = pci_set_consistent_dma_mask (pdev, DMA_32BIT_MASK)))
+	{
+	  TR0 ("NO usable DMA Configuration, aborting\n");
+	  return retval;
+	}
+      synop_pci_using_dac = 0;
+    }
+  if (synop_pci_using_dac)
+    TR ("64 bit double-address cycle Supported with this device\n");
+  
+  else
+    TR ("32 bit double-address cycle Supported with this device\n");
+  
+    //Setting the pci as master
+    pci_set_master (pdev);
+    
+  
+     Get the pci revision id */ 
+	/*********************************************************************************
+
+    if (get_revision (pdev) == 0x42)
+    return -ENODEV;
+ 
+    TR ("synopGMAC device found at slot %d, func %d\n",PCI_SLOT (pdev->devfn), PCI_FUNC (pdev->devfn));
+
+  {
+    
+      //u16 w  = 0, dw = 0;
+    TR ("****************************************************\n");
+    pci_read_config_word (pdev, PCI_COMMAND, &word_data);
+    TR ("COMMAND = %04x\n", word_data);
+    pci_read_config_word (pdev, PCI_STATUS, &word_data);
+    TR ("STATUS  = %04x\n", word_data);
+    pci_read_config_dword (pdev, PCI_CLASS_REVISION, &double_word_data);
+    TR ("CLASS_REVISION = %08x\n", double_word_data);
+    pci_read_config_dword (pdev, PCI_BASE_ADDRESS_0, &double_word_data);
+    TR ("BASE_ADDRESS_0 = %08x\n", double_word_data);
+    pci_read_config_dword (pdev, PCI_BASE_ADDRESS_1, &double_word_data);
+    TR ("BASE_ADDRESS_1 = %08x\n", double_word_data);
+    pci_read_config_dword (pdev, PCI_BASE_ADDRESS_2, &double_word_data);
+    TR ("BASE_ADDRESS_2 = %08x\n", double_word_data);
+    pci_read_config_dword (pdev, PCI_BASE_ADDRESS_3, &double_word_data);
+    TR ("BASE_ADDRESS_3 = %08x\n", double_word_data);
+    pci_read_config_dword (pdev, PCI_BASE_ADDRESS_4, &double_word_data);
+    TR ("BASE_ADDRESS_4 = %08x\n", double_word_data);
+    pci_read_config_dword (pdev, PCI_BASE_ADDRESS_5, &double_word_data);
+    TR ("BASE_ADDRESS_5 = %08x\n", double_word_data);
+    TR ("****************************************************\n");
+    
+    These are the retry counts without which driver fais to run movies :) */ 
+	/**********************************************************************************
+
+    pci_write_config_byte (pdev, 0x40, 0xff);
+    pci_write_config_byte (pdev, 0x41, 0xff);
+  }
+   */ 
+    /* Get the resource start address and the size for BARx in question In this case BAR0 */
+  /**********************************************************************************/
+
+//  the_register_resource_base = pci_resource_start (pdev, BAR0);
+//  the_register_resource_size = pci_resource_len (pdev, BAR0);
+//  TR ("BAR0 Base is %x size is %d\n", the_register_resource_base,the_register_resource_size);
+  
+    /*
+       Get the iomapped address which is nothing but the physical to virtual mapped address 
+       ioremap_nocahe  is similare to ioremap on most of the architectures. But The pci-ahb bridge 
+       BAR0 is mapped to 16M address space. If we ask for this much memory, Kernel refuses to 
+       give the same. 
+       
+       Note that 16M is too much of memory to request from kernel. 
+       Lets ask for less memory so that kernel is happy giving it  :)
+     */ 
+     
+//    synopGMACMappedAddr = (u8 *) ioremap_nocache ((u32) the_register_resource_base, (size_t) (128 * 1024));
+//    synopGMACMappedAddrSize = (128 * 1024);	// this is needed for remove function
+  
+//  if (!synopGMACMappedAddr){
+//      TR0 ("ioremap_nocache failed with addrrss %08x\n", (u32) synopGMACMappedAddr);
+//  }
+  
+//  TR ("Physical address = %08x\n", the_register_resource_base);
+//  TR ("Remapped address = %08x\n", (u32) synopGMACMappedAddr);
+  
+    /*Check if region is already locked by any other driver ? */ 
+	/**********************************************************************************
+
+    if (check_mem_region ((u32) synopGMACMappedAddr, synopGMACMappedAddrSize))
+    {
+      synopGMACMappedAddr = 0;	// Errored in checking memory region   
+      TR0("Memory Already Locked !!\n");
+      iounmap (synopGMACMappedAddr);
+      return -EBUSY;
+    }
+  
+Great We have free memory of required size.. Lets Lock it... */
+/**********************************************************************************
+
+    request_mem_region ((u32) synopGMACMappedAddr, synopGMACMappedAddrSize,"synopGMACmemory");
+    TR ("Requested memory region for synopGMACMappedAddr = 0x%x\n", (u32) synopGMACMappedAddr);
+  
+    Now pci interface is ready. Let give this information the the HOST module */ 
+/**********************************************************************************
+
+    synopGMACpcidev = pdev;
+  return 0;			// Everything is fine. So return 0.
+  *************************************************************************************************/
+/*revised by clm at 2014/9/9*/
+//dealloc:free_netdev(netdev);
+//         return ret;
+/*revised by clm at 2014/9/11*/
+err_alloc_etherdev:
+	TR0("Problem in alloc_etherdev()..Take Necessary action\n");
+	return err;
+}
+
+
+/**
+ * remove function of Linux pci driver.
+ * 
+ * 	- Releases the memory allocated by probe function
+ *	- Unmaps the memory region 
+ *
+ * \return Returns 0 on success and Error code on failure.
+ */ 
+ /*revised by clm at 2014/9/11*/
+/***************************************************************************************************************************/
+  static int gmac_remove (struct platform_device *pdev) 
+{
+  
+    /* Do the reverse of what probe does */ 
+    if (synopGMACMappedAddr)
+    {
+      TR0 ("Releaseing synopGMACMappedAddr 0x%x whose size is %d\n", (u32) synopGMACMappedAddr, synopGMACMappedAddrSize);
+      
+      /*release the memory region which we locked using request_mem_region */ 
+      release_mem_region ((u32) synopGMACMappedAddr, synopGMACMappedAddrSize);
+    }
+  TR0 ("Unmapping synopGMACMappedAddr =0x%x\n", (u32) synopGMACMappedAddr);
+  iounmap (synopGMACMappedAddr);
+  return 0;
+}
+/*Revised by clm at 2014/9/3*/
+static struct platform_driver gmac_driver_mapu= 
+{ .driver = {
+             .name = "mapu-gmac",//????????????????????????????????????
+			 .owner = THIS_MODULE,
+            },
+//  .id_table = ids, 
+  .probe = gmac_probe,
+  .remove = gmac_remove, 
+};
+/******************************************************************************/
+
+/**
+ * Function to initialize the Linux Pci Bus Interface.
+ * Registers the pci_driver 
+ * \return Returns 0 on success and Error code on failure.
+ */
+ /*revised by clm at 2014/9/3*/
+/*******************************************************************************/
+  s32 __init synopGMAC_init_platform_bus_interface (void) 
+{
+  s32 retval;
+  TR ("Now Going to Call platform_register_driver\n");
+  if (synopGMACMappedAddr)
+    return -EBUSY;
+  if ((retval = platform_driver_register (&gmac_driver_mapu)))
+    {
+      return retval;
+    }
+  if (!synopGMACMappedAddr)
+    {
+      platform_driver_unregister (&gmac_driver_mapu);
+      return -ENODEV;
+    }
+  return 0;
+}
+/*******************************************************************************/
+
+
+/**
+ * Function to De-initialize the Linux Pci Bus Interface.
+ * 
+ * Unregisters the pci_driver 
+ *
+ * \return Returns 0 on success and Error code on failure.
+ */ 
+
+  /*revised by clm at 2014/9/3*/
+ /*******************************************************************************/
+ void __exit synopGMAC_exit_platform_bus_interface (void) 
+{
+  TR0 ("Now Calling pci_unregister_driver\n");
+  platform_driver_unregister (&gmac_driver_mapu);
+} 
+/*******************************************************************************/
+
+/*
+module_init(synopGMAC_init_pci_bus_interface);
+module_exit(synopGMAC_exit_pci_bus_interface);
+
+MODULE_AUTHOR("Synopsys India");
+MODULE_DESCRIPTION("SYNOPSYS GMAC DRIVER PCI INTERFACE");
+
+EXPORT_SYMBOL(synopGMAC_init_pci_bus_interface);
+*/ 

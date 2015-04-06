@@ -1,0 +1,54 @@
+# arch/arm/mach-mapu/Kconfig
+#
+# Copyright (c) 2014 CASIA(Institute of Automation,Chinese Academy of Sciences) 
+#		
+#
+# Licensed under GPLv2
+
+# Configuration options for the mapu
+
+if ARCH_MAPU
+
+menu "MAPU Machines"
+		
+config MACH_MAPU
+	bool "mach-mapu"
+	select CPU_MAPU
+	select ICTL_MAPU
+	select	ARCH_SPARSEMEM_ENABLE 
+	
+	help
+	  Machine support for CASIA MAPU
+	  
+config CPU_MAPU
+	bool "mapu cpu support"
+ 
+	help
+	  Enable MAPU CPU support
+
+config ICTL_MAPU
+	bool "mapu ictl support"
+ 
+	help
+	  Enable MAPU interrupt controller support
+	  
+config GPIO_MAPU
+	bool "mapu gpio support"
+	select	GENERIC_GPIO 
+	select	ARCH_REQUIRE_GPIOLIB
+	help
+		Enable MAPU GPIO support
+
+config GPU_DEVICE
+	bool "mapu gpu device support"
+	help
+		Enable MAPU GPU support		
+
+config DMAC_MAPU
+	bool "mapu DMAC device support"
+	help
+		Enable MAPU DMAC support
+	  
+endmenu
+
+endif

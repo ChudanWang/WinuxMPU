@@ -1,0 +1,59 @@
+#
+# Network device configuration
+#
+
+menuconfig GMAC_MAPU_DRIVER
+	default y if UML
+	depends on NET
+	bool "Network device support for gmac driver"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all.
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux. If you are going to run SLIP or PPP over
+	  telephone line or null modem cable you need say Y here. Connecting
+	  two machines with parallel ports using PLIP needs this, as well as
+	  AX.25/KISS for sending Internet traffic over amateur radio links.
+
+	  See also "The Linux Network Administrator's Guide" by Olaf Kirch and
+	  Terry Dawson. Available at <http://www.tldp.org/guides.html>.
+
+	  If unsure, say Y.
+
+# All the following symbols are dependent on NETDEVICES - do not repeat
+# that for each of the symbols.
+if NETDEVICES
+
+ 
+
+config GMAC_MAPU
+	tristate " MAPU GMAC support"
+	depends on ARCH_MAPU
+	select CRC32
+	select GMII
+	---help---
+	  Support for GMAC chipset.
+
+	  To compile this driver as a module, choose M here.  The module
+	  will be called GMAC.
+
+config GMAC_DEBUGLEVEL
+	int "GMAC maximum debug level"
+	depends on GMAC_MAPU
+	default 4
+	help
+	  The maximum level of debugging code compiled into the GMAC
+	  driver.
+
+config GMAC_FORCE_SIMPLE_PHY_POLL
+	bool "Force simple NSR based PHY polling"
+	depends on GMAC_MAPU
+	---help---
+	  This configuration forces the gmac to use the NSR's LinkStatus
+	  bit to determine if the link is up or down instead of the more
+	  costly GMII PHY reads. Note, this will not work if the chip is
+	  operating with an external PHY.
+ 
+ 
+endif # NETDEVICES

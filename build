@@ -1,0 +1,4 @@
+ make;
+ cd arch/arm/boot;
+
+ mkimage -n 'linux-2.6.32' -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008040 -d zImage uImage-$1;
